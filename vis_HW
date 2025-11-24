@@ -1,0 +1,151 @@
+# -*- coding: utf-8 -*-
+
+#libraries
+import pandas as pd
+import matplotlib.pyplot as plt
+
+#data
+url = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_US.csv'
+covid_df = pd.read_csv(url, index_col=0)
+
+#figuring out which columns are actual dates
+meta_cols = [
+    'iso2','iso3','code3','FIPS','Admin2','Province_State','Country_Region',
+    'Lat','Long_','Combined_Key','Population'
+]
+date_cols = [c for c in covid_df.columns if c not in meta_cols]
+dates = pd.to_datetime(date_cols)
+
+#grabbing Utah and Florida data ahead of time
+utah = covid_df[covid_df['Province_State'] == 'Utah'].copy()
+fl = covid_df[covid_df['Province_State'] == 'Florida'].copy()
+latest_col = date_cols[-1]
+
+
+#viz 1
+
+"""
+Plotting all Utah counties over time with Salt Lake highlighted.
+Wanted it to look similar to the example from lecture
+"""
+
+slc = utah[utah['Admin2'] == 'Salt Lake'].iloc[0]
+
+plt.figure(figsize=(10, 6))
+
+#background Utah counties first
+for i in range(len(utah)):
+    row = utah.iloc[i]
+    plt.plot(dates, row[date_cols].values,
+             color='lightgrey', linewidth=1, alpha=0.6)
+
+#Salt Lake County highlighted
+plt.plot(
+    dates,
+    slc[date_cols].values,
+    color='crimson',
+    linewidth=2.5,
+    label='Salt Lake County'
+)
+
+plt.title('Utah Counties — COVID-19 Trends (Salt Lake Highlighted)')
+plt.xlabel('Date')
+plt.ylabel('Total Cases')
+plt.xticks(rotation=45)
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+#viz 2
+
+"""
+Comparing the highest case county in Utah to the highest case county in Florida.
+Just wanted a clean two line plot.
+"""
+
+utah_top = utah.loc[utah[latest_col].idxmax()]
+fl_top = fl.loc[fl[latest_col].idxmax()]
+
+plt.figure(figsize=(10, 6))
+
+plt.plot(dates, utah_top[date_cols].values,
+         linewidth=2,
+         label=f"{utah_top['Admin2']} County (Utah)")
+
+plt.plot(dates, fl_top[date_cols].values,
+         linewidth=2,
+         label=f"{fl_top['Admin2']} County (Florida)")
+
+plt.title('Highest-Case Counties: Utah vs Florida')
+plt.xlabel('Date')
+plt.ylabel('Total Cases')
+plt.xticks(rotation=45)
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+#viz 3
+
+"""
+Salt Lake County: cumulative vs daily new cases.
+Used a twin-axis since the scales are pretty different.
+"""
+
+cum_vals = slc[date_cols].astype(int)
+daily_vals = cum_vals.diff().fillna(0)
+
+fig, ax1 = plt.subplots(figsize=(10, 6))
+
+#daily new cases
+ax1.bar(dates, daily_vals, alpha=0.3, label='Daily New Cases')
+ax1.set_xlabel('Date')
+ax1.set_ylabel('Daily New Cases')
+
+#cumulative cases
+ax2 = ax1.twinx()
+ax2.plot(dates, cum_vals.values,
+         color='red',
+         linewidth=2,
+         label='Cumulative Cases')
+ax2.set_ylabel('Cumulative Cases')
+
+#merging legends
+l1, lab1 = ax1.get_legend_handles_labels()
+l2, lab2 = ax2.get_legend_handles_labels()
+ax1.legend(l1 + l2, lab1 + lab2, loc='upper left')
+
+plt.title('Salt Lake County — Daily New vs Cumulative Cases')
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+
+#viz 4
+
+"""
+Stacked bar chart for Utah county contributions.
+One bar = the whole state, stacked by counties.
+"""
+
+totals = utah[['Admin2', latest_col]].sort_values(by=latest_col, ascending=False)
+
+plt.figure(figsize=(7, 6))
+
+bottom = 0
+x = [0]
+
+for _, row in totals.iterrows():
+    plt.bar(x,
+            row[latest_col],
+            bottom=bottom,
+            label=f"{row['Admin2']} County")
+    bottom += row[latest_col]
+
+plt.xticks(x, ['Utah'])
+plt.ylabel('Total Cases')
+plt.title('Utah — County Contributions to Total COVID-19 Cases')
+plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='small')
+plt.tight_layout()
+plt.show()
